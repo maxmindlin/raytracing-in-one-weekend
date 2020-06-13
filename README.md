@@ -2,4 +2,6 @@ Rust implementation of the [Ray Tracing in One Weekend Book Series](https://gith
 
 Used as a learning excersize for raytracing + C++ translation.
 
-![result](images/in_one_weekend.png)
+<p align="center">
+    <img src="https://github.com/maxmindlin/raytracing-in-one-weekend/blob/master/images/in_one_weekend.png" alt="result image">
+</p>
