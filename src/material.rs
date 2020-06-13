@@ -27,7 +27,7 @@ impl Lambertian {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, r_in: &Ray, rec: &HitRecord, attenuation: &mut Color, scattered: &mut Ray) -> bool {
+    fn scatter(&self, _r_in: &Ray, rec: &HitRecord, attenuation: &mut Color, scattered: &mut Ray) -> bool {
         let scatter_dir = rec.normal + random_unit_vector();
         *scattered = Ray::new(&rec.p, &scatter_dir);
         *attenuation = self.albedo;
