@@ -11,70 +11,101 @@ use crate::vec::{
     random_in_unit_sphere,
 };
 
-#[derive(Clone, Copy)]
-pub enum Material {
-    Dielectric(f32),
-    Lambertian(Color),
-    Metal(Color, f32),
-    Empty,
+pub trait Material {
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord, attenuation: &mut Color, scattered: &mut Ray) -> bool;
+    fn clone(&self) -> Box<dyn Material>;
 }
 
-impl Default for Material {
-    fn default() -> Self {
-        Self::Empty
+pub struct Lambertian {
+    albedo: Color,
+}
+
+impl Lambertian {
+    pub fn new(albedo: Color) -> Self {
+        Self { albedo }
     }
 }
 
-impl Material {
-    pub fn scatter(&self, r_in: &Ray, rec: &HitRecord, attenuation: &mut Color, scattered: &mut Ray) -> bool {
-        match self {
-            Self::Lambertian(c) => {
-                let scatter_dir = rec.normal + random_unit_vector();
-                *scattered = Ray::new(&rec.p, &scatter_dir);
-                *attenuation = c.clone();
-                true
-            },
-            Self::Metal(c, f) => {
-                let u = unit_vector(r_in.dir);
-                let reflected = reflect(&u, &rec.normal) + *f * random_in_unit_sphere();
-                *scattered = Ray::new(&rec.p, &reflected);
-                *attenuation = c.clone();
-                dot(&scattered.dir, &rec.normal) > 0.0
-            },
-            Self::Dielectric(idx) => {
-                *attenuation = Color::new(1.0, 1.0, 1.0);
-                let etai_over_etat = match rec.front_face {
-                    true => 1.0 / idx,
-                    false => *idx,
-                };
+impl Material for Lambertian {
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord, attenuation: &mut Color, scattered: &mut Ray) -> bool {
+        let scatter_dir = rec.normal + random_unit_vector();
+        *scattered = Ray::new(&rec.p, &scatter_dir);
+        *attenuation = self.albedo;
+        true
+    }
 
-                let unit_dir = unit_vector(r_in.dir);
+    fn clone(&self) -> Box<dyn Material> {
+        Box::new(Self::new(self.albedo))
+    }
+}
 
-                let dotted = dot(&-unit_dir, &rec.normal);
+pub struct Metal {
+    albedo: Color,
+    roughness: f32,
+}
 
-                // f32 doesnt implement Ord, so you cant use cmp::min ? >:(
-                let cos_theta = if dotted > 1.0 { 1.0 } else { dotted };
-                let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
-                if (etai_over_etat * sin_theta) > 1.0 {
-                    let reflected = reflect(&unit_dir, &rec.normal);
-                    *scattered = Ray::new(&rec.p, &reflected);
-                    return true
-                }
+impl Metal {
+    pub fn new(albedo: Color, r: f32) -> Self {
+        Self { albedo, roughness: f32::min(r, 1.0) }
+    }
+}
 
-                let reflect_prob = schlick(cos_theta, etai_over_etat);
-                if random_f32() < reflect_prob {
-                    let reflected = reflect(&unit_dir, &rec.normal);
-                    *scattered = Ray::new(&rec.p, &reflected);
-                    return true
-                }
+impl Material for Metal {
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord, attenuation: &mut Color, scattered: &mut Ray) -> bool {
+        let u = unit_vector(r_in.dir);
+        let reflected = reflect(&u, &rec.normal) + self.roughness * random_in_unit_sphere();
+        *scattered = Ray::new(&rec.p, &reflected);
+        *attenuation = self.albedo;
+        dot(&scattered.dir, &rec.normal) > 0.0
+    }
 
-                let refracted = refract(&unit_dir, &rec.normal, etai_over_etat);
-                *scattered = Ray::new(&rec.p, &refracted);
+    fn clone(&self) -> Box<dyn Material> {
+        Box::new(Self::new(self.albedo, self.roughness))
+    }
+}
 
-                true
-            },
-            Self::Empty => false
+pub struct Dielectric {
+    ref_idx: f32,
+}
+
+impl Dielectric {
+    pub fn new(ref_idx: f32) -> Self {
+        Self { ref_idx }
+    }
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, r_in: &Ray, rec: &HitRecord, attenuation: &mut Color, scattered: &mut Ray) -> bool {
+        *attenuation = Color::new(1.0, 1.0, 1.0);
+
+        let etai_over_etat = if rec.front_face { 1.0 / self.ref_idx } else { self.ref_idx };
+
+        let unit_dir = unit_vector(r_in.dir);
+
+        let dotted = dot(&-unit_dir, &rec.normal);
+        let cos_theta = f32::min(dotted, 1.0);
+        let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
+        if (etai_over_etat * sin_theta) > 1.0 {
+            let reflected = reflect(&unit_dir, &rec.normal);
+            *scattered = Ray::new(&rec.p, &reflected);
+            return true
         }
+
+        let reflect_prob = schlick(cos_theta, etai_over_etat);
+        if random_f32() < reflect_prob {
+            let reflected = reflect(&unit_dir, &rec.normal);
+            *scattered = Ray::new(&rec.p, &reflected);
+            return true
+        }
+
+        let refracted = refract(&unit_dir, &rec.normal, etai_over_etat);
+        *scattered = Ray::new(&rec.p, &refracted);
+
+        true
+    }
+
+    fn clone(&self) -> Box<dyn Material> {
+        Box::new(Self::new(self.ref_idx))
     }
 }
 

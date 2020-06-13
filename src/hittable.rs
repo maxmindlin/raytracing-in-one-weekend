@@ -2,13 +2,12 @@ use crate::ray::Ray;
 use crate::vec::{Vec3, Point3, dot};
 use crate::material::Material;
 
-#[derive(Default, Clone, Copy)]
 pub struct HitRecord {
     pub p: Point3,
     pub normal: Vec3,
     pub t: f32,
     pub front_face: bool,
-    pub mat: Material,
+    pub mat: Box<dyn Material>,
 }
 
 impl HitRecord {
@@ -22,7 +21,7 @@ impl HitRecord {
 // object is "hittable" and therefore
 // if it is hit by a given ray.
 pub trait Hittable {
-    fn hit(&self, r: &Ray, t_min: f32, t_max: f32, rec: &mut HitRecord) -> bool;
+    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord>;
 }
 
 #[derive(Default)]
@@ -41,16 +40,13 @@ impl HittableList {
 }
 
 impl Hittable for HittableList {
-    fn hit(&self, r: &Ray, t_min: f32, t_max: f32, rec: &mut HitRecord) -> bool {
-        let mut temp_rec = HitRecord::default();
-        let mut hit_anything = false;
+    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+        let mut hit_anything: Option<HitRecord> = None;
         let mut closest_so_far = t_max;
         for obj in self.objects.iter() {
-            if obj.hit(r, t_min, closest_so_far, &mut temp_rec) {
-                hit_anything = true;
-                closest_so_far = temp_rec.t;
-                
-                *rec = temp_rec;
+            if let Some(temp_res) = obj.hit(r, t_min, closest_so_far) {
+                closest_so_far = temp_res.t;
+                hit_anything = Some(temp_res);
             }
         }
 

@@ -11,9 +11,9 @@ mod material;
 use vec::{Vec3, Point3, Color, unit_vector};
 use ray::Ray;
 use sphere::Sphere;
-use hittable::{HitRecord, Hittable, HittableList};
+use hittable::{Hittable, HittableList};
 use camera::Camera;
-use material::Material;
+use material::{Metal, Lambertian, Dielectric, Material};
 
 const ASPECT_RATIO: f32 = 16.0 / 9.0;
 const IMAGE_WIDTH: usize = 256;
@@ -38,13 +38,12 @@ fn clamp(x: f32, min: f32, max: f32) -> f32 {
 }
 
 fn ray_color<T: Hittable>(r: &Ray, world: &T, depth: usize) -> Color {
-    let mut rec = HitRecord::default();
     // We have exceeded the ray bounce limit, no more light is gathered.
     if depth <= 0 {
         return Color::new(0.0, 0.0, 0.0)
     }
 
-    if world.hit(r, 0.001, INF, &mut rec) {
+    if let Some(rec) = world.hit(r, 0.001, INF) {
         let mut scattered = Ray::default();
         let mut attenuation = Color::default();
         if rec.mat.scatter(r, &rec, &mut attenuation, &mut scattered) {
@@ -52,10 +51,6 @@ fn ray_color<T: Hittable>(r: &Ray, world: &T, depth: usize) -> Color {
         }
 
         return Color::new(0.0, 0.0, 0.0)
-        // let target = rec.p + rec.normal + random_in_hemisphere(&rec.normal);
-        // let diff = target - rec.p;
-        // let new_r = Ray::new(&rec.p, &diff);
-        // return 0.5 * ray_color(&new_r, world, depth - 1)
     }
 
     let unit_dir = unit_vector(r.dir);
@@ -85,7 +80,8 @@ fn write_color(pixel_color: Color, samples_per_pixel: usize) {
 fn random_scene() -> HittableList {
     let mut world = HittableList::default();
 
-    let ground_material = Material::Lambertian(Color::new(0.5, 0.5, 0.5));
+    // let ground_material = Material::Lambertian(Color::new(0.5, 0.5, 0.5));
+    let ground_material = Lambertian::new(Color::new(0.5, 0.5, 0.5));
     world.add(Box::new(Sphere::new(Point3::new(0.0, -1000.0, 0.0), 1000.0, ground_material.clone())));
 
     for a in -11..11 {
@@ -96,29 +92,29 @@ fn random_scene() -> HittableList {
             if (center - Point3::new(4.0, 0.2, 0.0)).length() > 0.9 {
                 if choose_mat < 0.8 {
                     let albedo = Color::random() * Color::random();
-                    let sphere_mat = Material::Lambertian(albedo);
-                    world.add(Box::new(Sphere::new(center, 0.2, sphere_mat)));
+                    let sphere_mat = Lambertian::new(albedo);
+                    world.add(Box::new(Sphere::new(center, 0.2, Box::new(sphere_mat))));
                 } else if choose_mat > 0.95 {
                     let albedo = Color::random_bounded(0.5, 1.0);
                     let fuzz = rand::thread_rng().gen_range(0.0, 0.5);
-                    let sphere_mat = Material::Metal(albedo, fuzz);
-                    world.add(Box::new(Sphere::new(center, 0.2, sphere_mat)));
+                    let sphere_mat = Metal::new(albedo, fuzz);
+                    world.add(Box::new(Sphere::new(center, 0.2, Box::new(sphere_mat))));
                 } else {
-                    let sphere_mat = Material::Dielectric(1.5);
-                    world.add(Box::new(Sphere::new(center, 0.2, sphere_mat)));
+                    let sphere_mat = Dielectric::new(1.5);
+                    world.add(Box::new(Sphere::new(center, 0.2, Box::new(sphere_mat))));
                 }
             }
         }
     }
 
-    let mat1 = Material::Dielectric(1.5);
-    world.add(Box::new(Sphere::new(Point3::new(0.0, 1.0, 0.0), 1.0, mat1)));
+    let mat1 = Dielectric::new(1.5);
+    world.add(Box::new(Sphere::new(Point3::new(0.0, 1.0, 0.0), 1.0, Box::new(mat1))));
 
-    let mat2 = Material::Lambertian(Color::new(0.4, 0.2, 0.1));
-    world.add(Box::new(Sphere::new(Point3::new(-4.0, 1.0, 0.0), 1.0, mat2)));
+    let mat2 = Lambertian::new(Color::new(0.4, 0.2, 0.1));
+    world.add(Box::new(Sphere::new(Point3::new(-4.0, 1.0, 0.0), 1.0, Box::new(mat2))));
 
-    let mat3 = Material::Metal(Color::new(0.7, 0.6, 0.5), 0.0);
-    world.add(Box::new(Sphere::new(Point3::new(4.0, 1.0, 0.0), 1.0, mat3)));
+    let mat3 = Metal::new(Color::new(0.7, 0.6, 0.5), 0.0);
+    world.add(Box::new(Sphere::new(Point3::new(4.0, 1.0, 0.0), 1.0, Box::new(mat3))));
 
     world
 }
