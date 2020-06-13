@@ -2,4 +2,4 @@ Rust implementation of the [Ray Tracing in One Weekend Book Series](https://gith
 
 Used as a learning excersize for raytracing + C++ translation.
 
-![result](image.ppm)
+![result](images/in_one_weekend.png)
